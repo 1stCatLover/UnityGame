@@ -8,11 +8,13 @@ public class Projectile : MonoBehaviour
     public float moveSpeed = 250f;
 
     private Rigidbody2D rb;
+    private RectTransform rectTransform;
     private Vector2 movement;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        rectTransform = GetComponent<RectTransform>();
     }
 
     void Start()
@@ -29,6 +31,12 @@ public class Projectile : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (rectTransform != null && rectTransform.parent is RectTransform)
+        {
+            rectTransform.anchoredPosition += movement * moveSpeed * Time.fixedDeltaTime;
+            return;
+        }
+
         if (rb == null)
             return;
 

@@ -96,9 +96,45 @@ public class Player : MonoBehaviour
             return;
         }
 
-        Vector3 mouseScreenPosition = Input.mousePosition;
-        mouseScreenPosition.z = Mathf.Abs(mainCamera.transform.position.z - transform.position.z);
-        Vector2 aimDirection = (Vector2)(mainCamera.ScreenToWorldPoint(mouseScreenPosition) - transform.position);
+        Vector2 aimDirection;
+        Camera aimCamera;
+
+        RectTransform parentRect = projectileParent as RectTransform;
+        Canvas parentCanvas = parentRect != null ? parentRect.GetComponentInParent<Canvas>() : null;
+
+        if (parentCanvas != null)
+        {
+            aimCamera = parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay
+                ? null
+                : (parentCanvas.worldCamera != null ? parentCanvas.worldCamera : mainCamera);
+
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                parentRect,
+                Input.mousePosition,
+                aimCamera,
+                out Vector2 mouseLocalPosition
+            );
+
+            Vector2 playerScreenPosition = RectTransformUtility.WorldToScreenPoint(
+                aimCamera,
+                transform.position
+            );
+
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                parentRect,
+                playerScreenPosition,
+                aimCamera,
+                out Vector2 playerLocalPosition
+            );
+
+            aimDirection = mouseLocalPosition - playerLocalPosition;
+        }
+        else
+        {
+            Vector3 mouseScreenPosition = Input.mousePosition;
+            mouseScreenPosition.z = Mathf.Abs(mainCamera.transform.position.z - transform.position.z);
+            aimDirection = (Vector2)(mainCamera.ScreenToWorldPoint(mouseScreenPosition) - transform.position);
+        }
 
         if (aimDirection.sqrMagnitude < 0.001f)
             return;
@@ -111,6 +147,28 @@ public class Player : MonoBehaviour
             Quaternion.Euler(0f, 0f, angle),
             projectileParent
         );
+
+        if (parentCanvas != null && projectile.transform is RectTransform projectileRect)
+        {
+            Camera uiCamera = parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay
+                ? null
+                : (parentCanvas.worldCamera != null ? parentCanvas.worldCamera : mainCamera);
+
+            Vector2 playerScreenPosition = RectTransformUtility.WorldToScreenPoint(
+                uiCamera,
+                transform.position
+            );
+
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                parentRect,
+                playerScreenPosition,
+                uiCamera,
+                out Vector2 playerLocalPosition
+            ))
+            {
+                projectileRect.anchoredPosition = playerLocalPosition;
+            }
+        }
 
         Projectile projectileMovement = projectile.GetComponent<Projectile>();
         if (projectileMovement != null)
