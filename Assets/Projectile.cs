@@ -1,11 +1,12 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class Projectile : MonoBehaviour
 {
     [Header("Movement Settings")]
     public float moveSpeed = 250f;
+
+    [Header("Lifetime")]
+    public float lifetime = 10f;
 
     private Rigidbody2D rb;
     private RectTransform rectTransform;
@@ -15,6 +16,9 @@ public class Projectile : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         rectTransform = GetComponent<RectTransform>();
+
+        if (lifetime > 0f)
+            Destroy(gameObject, lifetime);
     }
 
     void Start()

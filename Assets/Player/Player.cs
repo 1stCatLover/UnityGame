@@ -13,13 +13,39 @@ public class Player : MonoBehaviour
     public Transform projectileParent;
     public float fireRate = 0.15f;
 
+    [Header("Movement Boundary")]
+    public float boundaryRadius = 250f;
+    public bool showBoundary = true;
+    public Color boundaryColor = new Color(0.1f, 0.8f, 1f, 0.8f);
+
     private Rigidbody2D rb;
     private Vector2 movement;
     private float nextFireTime;
+    private RectTransform playerRect;
+    private RectTransform boundaryParent;
+    private Vector2 boundaryCenter;
+    private Vector2 currentVelocity;
+    private bool usesUIPosition;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+
+        playerRect = transform as RectTransform;
+        boundaryParent = playerRect != null ? playerRect.parent as RectTransform : null;
+        usesUIPosition = playerRect != null && boundaryParent != null;
+        boundaryCenter = usesUIPosition ? playerRect.anchoredPosition :
+            (rb != null ? rb.position : (Vector2)transform.position);
+
+        if (rb == null && !usesUIPosition)
+        {
+            Debug.LogError("Player needs a Rigidbody2D or a RectTransform parent to move.", this);
+            enabled = false;
+            return;
+        }
+
+        if (showBoundary && boundaryRadius > 0f && boundaryParent != null)
+            CreateBoundaryVisual();
     }
 
     void Update()
@@ -41,25 +67,37 @@ public class Player : MonoBehaviour
     void FixedUpdate()
     {
         Move();
+        ClampToBoundary();
         Rotate();
+    }
+
+    void LateUpdate()
+    {
+        // Clamp once more after physics moves the Rigidbody2D so the player
+        // cannot visually pass through the circle edge.
+        ClampToBoundary();
     }
 
     void Move()
     {
         Vector2 targetVelocity = movement * maxSpeed;
-
-        float speedChange;
-
-        if (movement != Vector2.zero)
-            speedChange = acceleration;
-        else
-            speedChange = deceleration;
-
-        rb.velocity = Vector2.MoveTowards(
-            rb.velocity,
+        float speedChange = movement != Vector2.zero ? acceleration : deceleration;
+        currentVelocity = Vector2.MoveTowards(
+            currentVelocity,
             targetVelocity,
             speedChange * Time.fixedDeltaTime
         );
+
+        if (usesUIPosition)
+        {
+            playerRect.anchoredPosition += currentVelocity * Time.fixedDeltaTime;
+            if (rb != null)
+                rb.velocity = Vector2.zero;
+            return;
+        }
+
+        if (rb != null)
+            rb.velocity = currentVelocity;
     }
 
     void Rotate()
@@ -72,13 +110,83 @@ public class Player : MonoBehaviour
             movement.x
         ) * Mathf.Rad2Deg - 90f;
 
+        float currentAngle = usesUIPosition ? transform.localEulerAngles.z : rb.rotation;
         float newAngle = Mathf.LerpAngle(
-            rb.rotation,
+            currentAngle,
             angle,
             rotationSpeed * Time.fixedDeltaTime
         );
 
-        rb.MoveRotation(newAngle);
+        if (usesUIPosition)
+            transform.localRotation = Quaternion.Euler(0f, 0f, newAngle);
+        else if (rb != null)
+            rb.MoveRotation(newAngle);
+    }
+
+    void ClampToBoundary()
+    {
+        if (boundaryRadius <= 0f)
+            return;
+
+        if (usesUIPosition)
+        {
+            Vector2 offset = playerRect.anchoredPosition - boundaryCenter;
+            float playerRadius = Mathf.Max(playerRect.rect.width, playerRect.rect.height) * 0.5f;
+            float allowedRadius = Mathf.Max(0f, boundaryRadius - playerRadius);
+
+            if (offset.sqrMagnitude > allowedRadius * allowedRadius)
+            {
+                Vector2 directionToPlayer = offset.normalized;
+                playerRect.anchoredPosition = boundaryCenter + directionToPlayer * allowedRadius;
+
+                float outwardSpeed = Vector2.Dot(currentVelocity, directionToPlayer);
+                if (outwardSpeed > 0f)
+                    currentVelocity -= directionToPlayer * outwardSpeed;
+            }
+
+            return;
+        }
+
+        if (rb == null)
+            return;
+
+        Vector2 worldOffset = rb.position - boundaryCenter;
+        if (worldOffset.sqrMagnitude > boundaryRadius * boundaryRadius)
+        {
+            Vector2 directionToPlayer = worldOffset.normalized;
+            rb.position = boundaryCenter + directionToPlayer * boundaryRadius;
+
+            float outwardSpeed = Vector2.Dot(rb.velocity, directionToPlayer);
+            if (outwardSpeed > 0f)
+                rb.velocity -= directionToPlayer * outwardSpeed;
+        }
+    }
+
+    void CreateBoundaryVisual()
+    {
+        GameObject boundaryObject = new GameObject(
+            "Player Movement Boundary",
+            typeof(RectTransform),
+            typeof(CircleBoundary)
+        );
+
+        RectTransform boundaryRect = boundaryObject.GetComponent<RectTransform>();
+        boundaryRect.SetParent(boundaryParent, false);
+        boundaryRect.anchorMin = new Vector2(0.5f, 0.5f);
+        boundaryRect.anchorMax = new Vector2(0.5f, 0.5f);
+        boundaryRect.pivot = new Vector2(0.5f, 0.5f);
+        boundaryRect.sizeDelta = Vector2.one * (boundaryRadius * 2f);
+        boundaryRect.anchoredPosition = boundaryCenter;
+
+        CircleBoundary boundary = boundaryObject.GetComponent<CircleBoundary>();
+        boundary.radius = boundaryRadius;
+        boundary.thickness = 3f;
+        boundary.color = boundaryColor;
+        boundary.raycastTarget = false;
+        boundary.SetVerticesDirty();
+
+        // Keep the ring behind the player and any projectiles.
+        boundaryObject.transform.SetAsFirstSibling();
     }
 
     void Shoot()
@@ -89,18 +197,19 @@ public class Player : MonoBehaviour
             return;
         }
 
+        Transform spawnParent = projectileParent != null ? projectileParent : transform.parent;
+        RectTransform parentRect = spawnParent as RectTransform;
+        Canvas parentCanvas = parentRect != null ? parentRect.GetComponentInParent<Canvas>() : null;
         Camera mainCamera = Camera.main;
-        if (mainCamera == null)
+
+        if (parentCanvas == null && mainCamera == null)
         {
-            Debug.LogWarning("A camera tagged MainCamera is required to aim at the mouse.");
+            Debug.LogWarning("A camera tagged MainCamera is required to aim world-space projectiles.");
             return;
         }
 
         Vector2 aimDirection;
         Camera aimCamera;
-
-        RectTransform parentRect = projectileParent as RectTransform;
-        Canvas parentCanvas = parentRect != null ? parentRect.GetComponentInParent<Canvas>() : null;
 
         if (parentCanvas != null)
         {
@@ -145,7 +254,7 @@ public class Player : MonoBehaviour
             Bullet,
             transform.position,
             Quaternion.Euler(0f, 0f, angle),
-            projectileParent
+            spawnParent
         );
 
         if (parentCanvas != null && projectile.transform is RectTransform projectileRect)
