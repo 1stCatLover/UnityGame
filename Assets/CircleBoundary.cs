@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(RectTransform))]
 public class CircleBoundary : MaskableGraphic
@@ -12,6 +13,19 @@ public class CircleBoundary : MaskableGraphic
 
     [Min(0.1f)]
     public float thickness = 3f;
+
+    [Header("Boundary Squares")]
+    [Min(1)]
+    public int density = 32;
+
+    [Min(1f)]
+    public float squareSize = 8f;
+
+    public Color squareColor = Color.white;
+
+    public Transform squareParent;
+
+    private readonly List<GameObject> squares = new List<GameObject>();
 
     protected override void OnPopulateMesh(VertexHelper vertexHelper)
     {
@@ -48,6 +62,64 @@ public class CircleBoundary : MaskableGraphic
         segments = Mathf.Max(3, segments);
         radius = Mathf.Max(0.1f, radius);
         thickness = Mathf.Max(0.1f, thickness);
+        density = Mathf.Max(1, density);
+        squareSize = Mathf.Max(1f, squareSize);
         SetVerticesDirty();
+    }
+
+    public void CreateBoundarySquares()
+    {
+        ClearBoundarySquares();
+
+        Transform parent = squareParent != null ? squareParent : transform.parent;
+        if (!(parent is RectTransform))
+        {
+            Debug.LogWarning("Boundary square parent must have a RectTransform.", this);
+            return;
+        }
+
+        int squareCount = Mathf.Max(1, density);
+        float angleStep = Mathf.PI * 2f / squareCount;
+        for (int i = 0; i < squareCount; i++)
+        {
+            float angle = i * angleStep;
+            Vector3 localPosition = new Vector3(
+                Mathf.Cos(angle) * radius,
+                Mathf.Sin(angle) * radius,
+                0f
+            );
+
+            GameObject square = new GameObject(
+                "Boundary Square " + i,
+                typeof(RectTransform),
+                typeof(Image)
+            );
+
+            RectTransform squareRect = square.GetComponent<RectTransform>();
+            squareRect.SetParent(parent, false);
+            squareRect.anchorMin = new Vector2(0.5f, 0.5f);
+            squareRect.anchorMax = new Vector2(0.5f, 0.5f);
+            squareRect.pivot = new Vector2(0.5f, 0.5f);
+            squareRect.sizeDelta = Vector2.one * squareSize;
+            squareRect.position = transform.TransformPoint(localPosition);
+            squareRect.rotation = Quaternion.identity;
+
+            Image squareImage = square.GetComponent<Image>();
+            squareImage.color = squareColor;
+            squareImage.raycastTarget = false;
+
+            squares.Add(square);
+        }
+    }
+
+    public void ClearBoundarySquares()
+    {
+        for (int i = 0; i < squares.Count; i++)
+        {
+            if (squares[i] != null)
+                Destroy(squares[i]);
+        }
+
+        squares.Clear();
     }
 }

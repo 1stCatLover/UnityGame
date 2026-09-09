@@ -17,6 +17,12 @@ public class Player : MonoBehaviour
     public float boundaryRadius = 250f;
     public bool showBoundary = true;
     public Color boundaryColor = new Color(0.1f, 0.8f, 1f, 0.8f);
+    [Min(1)]
+    public int boundaryDensity = 32;
+    [Min(1f)]
+    public float boundarySquareSize = 8f;
+    public Color boundarySquareColor = Color.white;
+    public Transform boundarySquareParent;
 
     private Rigidbody2D rb;
     private Vector2 movement;
@@ -182,8 +188,15 @@ public class Player : MonoBehaviour
         boundary.radius = boundaryRadius;
         boundary.thickness = 3f;
         boundary.color = boundaryColor;
+        boundary.density = Mathf.Max(1, boundaryDensity);
+        boundary.squareSize = Mathf.Max(1f, boundarySquareSize);
+        boundary.squareColor = boundarySquareColor;
+        boundary.squareParent = boundarySquareParent != null
+            ? boundarySquareParent
+            : boundaryParent;
         boundary.raycastTarget = false;
         boundary.SetVerticesDirty();
+        boundary.CreateBoundarySquares();
 
         // Keep the ring behind the player and any projectiles.
         boundaryObject.transform.SetAsFirstSibling();
