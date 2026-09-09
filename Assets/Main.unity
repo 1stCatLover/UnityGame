@@ -505,6 +505,7 @@ MonoBehaviour:
   boundarySquareSize: 8
   boundarySquareColor: {r: 1, g: 1, b: 1, a: 1}
   boundarySquareParent: {fileID: 2100000001}
+  boundarySquarePrefab: {fileID: 100100000, guid: e189d692bb694c3081722da2970b4900, type: 3}
 --- !u!114 &1527381410
 MonoBehaviour:
   m_ObjectHideFlags: 0

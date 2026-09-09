@@ -23,6 +23,7 @@ public class Player : MonoBehaviour
     public float boundarySquareSize = 8f;
     public Color boundarySquareColor = Color.white;
     public Transform boundarySquareParent;
+    public GameObject boundarySquarePrefab;
 
     private Rigidbody2D rb;
     private Vector2 movement;
@@ -173,7 +174,7 @@ public class Player : MonoBehaviour
         GameObject boundaryObject = new GameObject(
             "Player Movement Boundary",
             typeof(RectTransform),
-            typeof(CircleBoundary)
+            typeof(Boundary)
         );
 
         RectTransform boundaryRect = boundaryObject.GetComponent<RectTransform>();
@@ -184,7 +185,7 @@ public class Player : MonoBehaviour
         boundaryRect.sizeDelta = Vector2.one * (boundaryRadius * 2f);
         boundaryRect.anchoredPosition = boundaryCenter;
 
-        CircleBoundary boundary = boundaryObject.GetComponent<CircleBoundary>();
+        Boundary boundary = boundaryObject.GetComponent<Boundary>();
         boundary.radius = boundaryRadius;
         boundary.thickness = 3f;
         boundary.color = boundaryColor;
@@ -194,6 +195,7 @@ public class Player : MonoBehaviour
         boundary.squareParent = boundarySquareParent != null
             ? boundarySquareParent
             : boundaryParent;
+        boundary.squarePrefab = boundarySquarePrefab;
         boundary.raycastTarget = false;
         boundary.SetVerticesDirty();
         boundary.CreateBoundarySquares();

@@ -1,9 +1,9 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections.Generic;
 
 [RequireComponent(typeof(RectTransform))]
-public class CircleBoundary : MaskableGraphic
+public class Boundary : MaskableGraphic
 {
     [Min(3)]
     public int segments = 96;
@@ -22,8 +22,8 @@ public class CircleBoundary : MaskableGraphic
     public float squareSize = 8f;
 
     public Color squareColor = Color.white;
-
     public Transform squareParent;
+    public GameObject squarePrefab;
 
     private readonly List<GameObject> squares = new List<GameObject>();
 
@@ -71,6 +71,12 @@ public class CircleBoundary : MaskableGraphic
     {
         ClearBoundarySquares();
 
+        if (squarePrefab == null)
+        {
+            Debug.LogWarning("Boundary square prefab is not assigned.", this);
+            return;
+        }
+
         Transform parent = squareParent != null ? squareParent : transform.parent;
         if (!(parent is RectTransform))
         {
@@ -80,6 +86,7 @@ public class CircleBoundary : MaskableGraphic
 
         int squareCount = Mathf.Max(1, density);
         float angleStep = Mathf.PI * 2f / squareCount;
+
         for (int i = 0; i < squareCount; i++)
         {
             float angle = i * angleStep;
@@ -89,14 +96,17 @@ public class CircleBoundary : MaskableGraphic
                 0f
             );
 
-            GameObject square = new GameObject(
-                "Boundary Square " + i,
-                typeof(RectTransform),
-                typeof(Image)
-            );
+            GameObject square = Instantiate(squarePrefab, parent, false);
+            square.name = "Boundary Square " + i;
 
             RectTransform squareRect = square.GetComponent<RectTransform>();
-            squareRect.SetParent(parent, false);
+            if (squareRect == null)
+            {
+                Debug.LogWarning("Boundary square prefab must have a RectTransform.", squarePrefab);
+                Destroy(square);
+                continue;
+            }
+
             squareRect.anchorMin = new Vector2(0.5f, 0.5f);
             squareRect.anchorMax = new Vector2(0.5f, 0.5f);
             squareRect.pivot = new Vector2(0.5f, 0.5f);
@@ -105,9 +115,13 @@ public class CircleBoundary : MaskableGraphic
             squareRect.rotation = Quaternion.identity;
 
             Image squareImage = square.GetComponent<Image>();
-            squareImage.color = squareColor;
-            squareImage.raycastTarget = false;
+            if (squareImage != null)
+            {
+                squareImage.color = squareColor;
+                squareImage.raycastTarget = false;
+            }
 
+            square.SetActive(true);
             squares.Add(square);
         }
     }
